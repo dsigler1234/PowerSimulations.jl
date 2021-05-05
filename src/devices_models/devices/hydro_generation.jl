@@ -388,8 +388,18 @@ function commit_hydro_active_power_ub!(
                                   device_timeseries_ub!,
             ),
         )
-        device_range_constraints!(optimization_container, devices, model, feedforward, spec)
+        push!(optimization_container.specifications, (devices, model, feedforward, spec))
     end
+end
+
+function apply_constraint!(
+    optimization_container::OptimizationContainer,
+    devices::IS.FlattenIteratorWrapper{T},
+    model::DeviceModel{T, U},
+    feedforward::Union{Nothing, AbstractAffectFeedForward},
+    spec::DeviceRangeConstraintSpec,
+) where {T <: PSY.Device, U <: AbstractDeviceFormulation}
+    device_range_constraints!(optimization_container, devices, model, feedforward, spec)
 end
 
 ######################## Energy balance constraints ############################

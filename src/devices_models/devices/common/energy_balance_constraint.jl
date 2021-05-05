@@ -62,6 +62,16 @@ function add_constraints!(
         use_parameters,
         use_forecasts,
     )
+    push!(optimization_container.specifications, (devices, model, feedforward, spec))
+end
+
+function apply_constraint!(
+    optimization_container::OptimizationContainer,
+    devices::IS.FlattenIteratorWrapper{T},
+    model::DeviceModel{T, U},
+    feedforward::Union{Nothing, AbstractAffectFeedForward},
+    spec::DeviceEnergyBalanceConstraintSpec,
+) where {T <: PSY.Device, U <: AbstractDeviceFormulation}
     energy_balance_constraints!(optimization_container, devices, model, feedforward, spec)
 end
 
@@ -152,7 +162,7 @@ If t > 1:
 `` x^{energy}_t == x^{energy}_{t-1} + frhr \eta^{in} x^{in}_t - \frac{frhr}{\eta^{out}} x^{out}_t, \forall t \geq 2 ``
 # Arguments
 * optimization_container::OptimizationContainer : the optimization_container model built in PowerSimulations
-* inputs::Vector{DeviceEnergyBalanceConstraintSpecInternal} : stores constraint information 
+* inputs::Vector{DeviceEnergyBalanceConstraintSpecInternal} : stores constraint information
 """
 function energy_balance!(
     optimization_container::OptimizationContainer,
@@ -229,7 +239,7 @@ If t > 1:
 `` x^{energy}_t == x^{energy}_{t-1} + frhr \eta^{in} x^{in}_t - \frac{frhr}{\eta^{out}} x^{out}_t, \forall t \geq 2 ``
 # Arguments
 * optimization_container::OptimizationContainer : the optimization_container model built in PowerSimulations
-* inputs::Vector{DeviceEnergyBalanceConstraintSpecInternal} : stores constraint information 
+* inputs::Vector{DeviceEnergyBalanceConstraintSpecInternal} : stores constraint information
 """
 function energy_balance_param!(
     optimization_container::OptimizationContainer,

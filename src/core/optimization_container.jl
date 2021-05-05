@@ -16,6 +16,7 @@ mutable struct OptimizationContainer <: AbstractModelContainer
     pm::Union{Nothing, PM.AbstractPowerModel}
     base_power::Float64
     solve_timed_log::Dict{Symbol, Any}
+    specifications::Vector{Any}
 
     function OptimizationContainer(
         sys::PSY.System,
@@ -43,6 +44,7 @@ mutable struct OptimizationContainer <: AbstractModelContainer
             nothing,
             PSY.get_base_power(sys),
             Dict{Symbol, Any}(),
+            [],
         )
     end
 end
@@ -717,6 +719,8 @@ function build_impl!(
         end
     end
 
+    apply_constraint_specifications!(optimization_container)
+
     TimerOutputs.@timeit BUILD_PROBLEMS_TIMER "Objective" begin
         @debug "Building Objective"
         JuMP.@objective(
@@ -729,4 +733,16 @@ function build_impl!(
 
     check_optimization_container(optimization_container)
     return
+end
+
+
+function apply_constraint_specifications!(optimization_container)
+    for specification in optimization_container.specifications
+        (devices, model, feedforward, spec) = specification
+        apply_constraint!(optimization_container, devices, model, feedforward, spec)
+    end
+end
+
+function apply_constraint!(optimization_container, devices, model, feedforward, spec)
+    nothing
 end
