@@ -1,4 +1,18 @@
 abstract type AbstractModelContainer end
+abstract type AbstractSpecification end
+
+# The fields of this struct can be made more specific
+#     for each type of constraint.
+# For example, potentially the `spec` field may not be needed
+#     and that data can be collapsed into this parent struct.
+# ConstraintSpecification is dispatched on in `apply_constraint!`.
+# TODO: This design can be expanded on in future work
+struct ConstraintSpecification <: AbstractSpecification
+    devices
+    model
+    feedforward
+    spec
+end
 
 mutable struct OptimizationContainer <: AbstractModelContainer
     JuMPmodel::JuMP.Model
@@ -16,7 +30,7 @@ mutable struct OptimizationContainer <: AbstractModelContainer
     pm::Union{Nothing, PM.AbstractPowerModel}
     base_power::Float64
     solve_timed_log::Dict{Symbol, Any}
-    specifications::Vector{Any}
+    specifications::DefaultDict
 
     function OptimizationContainer(
         sys::PSY.System,
@@ -26,6 +40,8 @@ mutable struct OptimizationContainer <: AbstractModelContainer
         resolution = PSY.get_time_series_resolution(sys)
         resolution = IS.time_period_conversion(resolution)
         use_parameters = get_use_parameters(settings)
+        # TODO: use `T` to create `Vector{ConstraintSpecification{T}}([])` instead of `[]`
+        specifications = DefaultDict(T -> [], passkey=true)
 
         new(
             jump_model === nothing ? _make_jump_model(settings) :
@@ -44,7 +60,7 @@ mutable struct OptimizationContainer <: AbstractModelContainer
             nothing,
             PSY.get_base_power(sys),
             Dict{Symbol, Any}(),
-            [],
+            specifications
         )
     end
 end
@@ -719,7 +735,7 @@ function build_impl!(
         end
     end
 
-    apply_constraint_specifications!(optimization_container)
+    apply_constraint!(optimization_container)
 
     TimerOutputs.@timeit BUILD_PROBLEMS_TIMER "Objective" begin
         @debug "Building Objective"
@@ -736,12 +752,19 @@ function build_impl!(
 end
 
 
-function apply_constraint_specifications!(optimization_container)
-    for specification in optimization_container.specifications
-        (devices, model, feedforward, spec) = specification
-        apply_constraint!(optimization_container, devices, model, feedforward, spec)
+function apply_constraint!(optimization_container)
+    for specifications in values(optimization_container.specifications)
+        for specification in specifications
+            apply_constraint!(optimization_container, specification)
+        end
     end
 end
+
+
+function apply_constraint!(optimization_container, specification::AbstractSpecification)
+    apply_constraint!(optimization_container, specification.devices, specification.model, specification.feedforward, specification.spec)
+end
+
 
 function apply_constraint!(optimization_container, devices, model, feedforward, spec)
     nothing

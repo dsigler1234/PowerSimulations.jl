@@ -62,7 +62,7 @@ function add_constraints!(
         use_parameters,
         use_forecasts,
     )
-    push!(optimization_container.specifications, (devices, model, feedforward, spec))
+    push!(optimization_container.specifications[DeviceEnergyBalanceConstraintSpec], ConstraintSpecification(devices, model, feedforward, spec))
 end
 
 function apply_constraint!(

@@ -218,7 +218,6 @@ function ramp_constraints!(
     container_dn =
         add_cons_container!(optimization_container, :ramp_limits_dn, names, time_steps)
 
-
     for d in devices
         ramp_limits = PSY.get_ramp_limits(d)
         ramp_limits === nothing && continue
@@ -227,11 +226,11 @@ function ramp_constraints!(
         for t in time_steps
             container_up[name, t] = JuMP.@constraint(
                 optimization_container.JuMPmodel,
-                R_up[name, t] + <= ramp_limits.up * scaling_factor
+                R_up[name, t] <= ramp_limits.up * scaling_factor
             )
             container_dn[name, t] = JuMP.@constraint(
                 optimization_container.JuMPmodel,
-                R_dn[name, t] + <= ramp_limits.down * scaling_factor
+                R_dn[name, t] <= ramp_limits.down * scaling_factor
             )
         end
     end

@@ -388,7 +388,7 @@ function commit_hydro_active_power_ub!(
                                   device_timeseries_ub!,
             ),
         )
-        push!(optimization_container.specifications, (devices, model, feedforward, spec))
+        push!(optimization_container.specifications[DeviceRangeConstraintSpec], ConstraintSpecification(devices, model, feedforward, spec))
     end
 end
 

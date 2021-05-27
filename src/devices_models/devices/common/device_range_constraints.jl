@@ -92,7 +92,7 @@ function add_constraints!(
     @assert !(use_parameters && !use_forecasts)
     spec =
         DeviceRangeConstraintSpec(T, U, V, W, X, feedforward, use_parameters, use_forecasts)
-    push!(optimization_container.specifications, (devices, model, feedforward, spec))
+    push!(optimization_container.specifications[DeviceRangeConstraintSpec], ConstraintSpecification(devices, model, feedforward, spec))
 end
 
 function apply_constraint!(optimization_container, devices, model, feedforward, spec::DeviceRangeConstraintSpec)
