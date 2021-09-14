@@ -191,6 +191,25 @@ function construct_device!(
 
     return
 end
+##################### my code ##############################
+function construct_device!(
+    optimization_container::OptimizationContainer,
+    sys::PSY.System,
+    model::DeviceModel{L, StaticPowerLoad},
+    ::Type{S},
+    partition_number,
+) where {L <: PSY.ElectricLoad, S <: PM.AbstractPowerModel}
+    devices = get_available_components(L, sys,partition_number)
+
+    if !validate_available_devices(L, devices)
+        return
+    end
+
+    nodal_expression!(optimization_container, devices, S)
+
+    return
+end
+#############################################################
 
 function construct_device!(
     optimization_container::OptimizationContainer,

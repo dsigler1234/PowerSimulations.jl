@@ -54,6 +54,28 @@ function construct_device!(
     )
     return
 end
+################### my code ###################
+function construct_device!(
+    optimization_container::OptimizationContainer,
+    sys::PSY.System,
+    model::DeviceModel{B, StaticBranch},
+    ::Type{S},
+    partition_number,
+) where {B <: PSY.ACBranch, S <: PM.AbstractActivePowerModel}
+    devices = get_available_components(B, sys, partition_number)
+    if !validate_available_devices(B, devices)
+        return
+    end
+    branch_rate_constraints!(
+        optimization_container,
+        devices,
+        model,
+        S,
+        get_feedforward(model),
+    )
+    return
+end
+################################################
 
 # For DC Power only
 function construct_device!(

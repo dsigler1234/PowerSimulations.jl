@@ -106,6 +106,41 @@ function construct_network!(
     return
 end
 
+################# my code #################################
+function construct_network!(
+    optimization_container::OptimizationContainer,
+    sys::PSY.System,
+    ::Type{T},
+    template::OperationsProblemTemplate,
+    partition_number::Int;
+    instantiate_model = instantiate_nip_expr_model,
+) where {T <: PM.AbstractPowerModel}
+    if T in UNSUPPORTED_POWERMODELS
+        throw(
+            ArgumentError(
+                "$(T) formulation is not currently supported in PowerSimulations",
+            ),
+        )
+    end
+
+    if get_balance_slack_variables(optimization_container.settings)
+        add_slacks!(optimization_container, T)
+    end
+
+    @debug "Building the $T network with $instantiate_model method"
+    powermodels_network!(optimization_container, T, sys, template, partition_number, instantiate_model)
+    add_pm_var_refs!(optimization_container, T, sys)
+    add_pm_con_refs!(optimization_container, T, sys)
+    # have a function that goes in and deletes the nodal balance constraints 
+    for gb in get_ghost_buses(PSY.Bus, sys,partition_number)
+        name = PSY.get_name(gb)
+        JuMP.delete.(optimization_container.JuMPmodel,optimization_container.constraints[:nodal_balance_active__Bus][name,:])
+    end
+
+    return
+end
+###########################################################
+
 function construct_network!(
     optimization_container::OptimizationContainer,
     sys::PSY.System,

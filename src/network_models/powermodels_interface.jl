@@ -355,6 +355,41 @@ function powermodels_network!(
     return
 end
 
+########## my code ##############################
+function powermodels_network!(
+    optimization_container::OptimizationContainer,
+    system_formulation::Type{S},
+    sys::PSY.System,
+    template::OperationsProblemTemplate,
+    partition_number::Int,
+    instantiate_model = instantiate_nip_expr_model,
+) where {S <: PM.AbstractActivePowerModel}
+    time_steps = model_time_steps(optimization_container)
+    pm_data, PM_map = pass_to_pm(sys, template, time_steps[end],partition_number)
+    buses = get_components(PSY.Bus, sys,partition_number,ghostbuses=true)
+
+    remove_undef!(optimization_container.expressions[:nodal_balance_active])
+
+    for t in time_steps, bus in buses
+        pm_data["nw"]["$(t)"]["bus"]["$(PSY.get_number(bus))"]["inj_p"] =
+            optimization_container.expressions[:nodal_balance_active][
+                PSY.get_number(bus),
+                t,
+            ]
+        # pm_data["nw"]["$(t)"]["bus"]["$(bus.number)"]["inj_q"] = 0.0
+    end
+
+    optimization_container.pm = instantiate_model(
+        pm_data,
+        system_formulation,
+        jump_model = optimization_container.JuMPmodel,
+    )
+    optimization_container.pm.ext[:PMmap] = PM_map
+
+    return
+end
+##################################################
+
 #### PM accessor functions ########
 
 function PMvarmap(::Type{S}) where {S <: PM.AbstractDCPModel}

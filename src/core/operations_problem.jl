@@ -225,7 +225,23 @@ function OperationsProblem(
 )
     return OperationsProblem{GenericOpProblem}(template, sys, jump_model; kwargs...)
 end
+###################### my code ##################
+abstract type ADMMSubProblem <: PSI.PowerSimulationsOperationsProblem end
+add_to_ext!(p::PSI.OperationsProblem, key, data) = p.ext[key] = data
 
+function OperationsProblem(
+    ::Type{ADMMSubProblem},
+    template::OperationsProblemTemplate,
+    sys::PSY.System,
+    partition_number,
+    jump_model::Union{Nothing, JuMP.AbstractModel} = nothing;
+    kwargs...,
+)
+    problem = OperationsProblem{ADMMSubProblem}(template, sys, jump_model; kwargs...)
+    add_to_ext!(problem, "partition_number", partition_number)
+    return problem
+end
+##################################################
 """
     OperationsProblem(filename::AbstractString)
 
@@ -488,6 +504,30 @@ function _build!(problem::OperationsProblem{<:AbstractOperationsProblem}, serial
     return get_status(problem)
 end
 
+################ my code ##################
+function _build!(problem::OperationsProblem{ADMMSubProblem}, serialize::Bool)
+    TimerOutputs.@timeit BUILD_PROBLEMS_TIMER "Problem $(get_name(problem))" begin
+        try
+            ext = problem.ext
+            settings = PSI.get_settings(problem)
+            settings.ext["partition_number"] = ext["partition_number"]
+            build_pre_step!(problem)
+            problem_build!(problem)
+            serialize && serialize_problem(problem)
+            serialize && serialize_optimization_model(problem)
+            set_status!(problem, BuildStatus.BUILT)
+            log_values(get_settings(problem))
+            !built_for_simulation(problem) && @info "\n$(BUILD_PROBLEMS_TIMER)\n"
+        catch e
+            set_status!(problem, BuildStatus.FAILED)
+            bt = catch_backtrace()
+            @error "Operation Problem Build Failed" exception = e, bt
+        end
+    end
+    return get_status(problem)
+end
+###########################################
+
 """Implementation of build for any OperationsProblem"""
 function build!(
     problem::OperationsProblem{<:AbstractOperationsProblem};
@@ -523,6 +563,17 @@ function problem_build!(problem::OperationsProblem{<:PowerSimulationsOperationsP
         get_system(problem),
     )
 end
+
+############### my code ####################
+function problem_build!(problem::OperationsProblem{ADMMSubProblem})
+    build_impl!(
+        get_optimization_container(problem),
+        get_template(problem),
+        get_system(problem),
+        true,
+    )
+end
+#############################################
 
 serialize_optimization_model(::OperationsProblem) = nothing
 serialize_problem(::OperationsProblem) = nothing

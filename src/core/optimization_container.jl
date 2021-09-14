@@ -732,3 +732,61 @@ function build_impl!(
     check_optimization_container(optimization_container)
     return
 end
+
+######################### my code ########################
+get_parition_number(optimization_container::OptimizationContainer) = optimization_container.settings.ext["partition_number"]
+
+
+function build_impl!(
+    optimization_container::OptimizationContainer,
+    template::OperationsProblemTemplate,
+    sys::PSY.System,
+    partiion::Bool,
+)
+    partition_number = get_parition_number(optimization_container)
+    transmission = template.transmission
+    # Order is required
+    TimerOutputs.@timeit BUILD_PROBLEMS_TIMER "Services" begin
+        construct_services!(
+            optimization_container,
+            sys,
+            template.services,
+            template.devices,
+        )
+    end
+    for device_model in values(template.devices)
+        @debug "Building $(device_model.component_type) with $(device_model.formulation) formulation"
+        TimerOutputs.@timeit BUILD_PROBLEMS_TIMER "$(device_model.component_type)" begin
+            construct_device!(optimization_container, sys, device_model, transmission,partition_number)
+            @debug get_problem_size(optimization_container)
+        end
+    end
+
+    TimerOutputs.@timeit BUILD_PROBLEMS_TIMER "$(transmission)" begin
+        @debug "Building $(transmission) network formulation"
+        construct_network!(optimization_container, sys, transmission, template, partition_number)
+        @debug get_problem_size(optimization_container)
+    end
+
+    for branch_model in values(template.branches)
+        @debug "Building $(branch_model.component_type) with $(branch_model.formulation) formulation"
+        TimerOutputs.@timeit BUILD_PROBLEMS_TIMER "$(branch_model.component_type)" begin
+            construct_device!(optimization_container, sys, branch_model, transmission, partition_number)
+            @debug get_problem_size(optimization_container)
+        end
+    end
+
+    TimerOutputs.@timeit BUILD_PROBLEMS_TIMER "Objective" begin
+        @debug "Building Objective"
+        JuMP.@objective(
+            optimization_container.JuMPmodel,
+            MOI.MIN_SENSE,
+            optimization_container.cost_function
+        )
+    end
+    @debug "Total operation count $(optimization_container.JuMPmodel.operator_counter)"
+
+    check_optimization_container(optimization_container)
+    return
+end
+#######################################################

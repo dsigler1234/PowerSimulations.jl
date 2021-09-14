@@ -306,6 +306,56 @@ function get_branches_to_pm(
     return PM_branches, PMmap_br
 end
 
+################ my code #########################
+function get_branches_to_pm(
+    sys::PSY.System,
+    system_formulation::Type{S},
+    branch_type::Type{T},
+    partition_number::Int,
+    branch_template::BranchModelContainer,
+    start_idx = 0,
+) where {T <: PSY.Branch, S <: PM.AbstractPowerModel}
+    PM_branches = Dict{String, Any}()
+    PMmap_br = Dict{
+        NamedTuple{(:from_to, :to_from), Tuple{Tuple{Int, Int, Int}, Tuple{Int, Int, Int}}},
+        t where t <: T,
+    }()
+
+    for (d, device_model) in branch_template
+        !(device_model.component_type <: branch_type) && continue
+        start_idx += length(PM_branches)
+        for (i, branch) in enumerate(get_available_components(device_model.component_type, sys,partition_number))
+            ix = i + start_idx
+            PM_branches["$(ix)"] = get_branch_to_pm(ix, branch, device_model.formulation)
+            if PM_branches["$(ix)"]["br_status"] == true
+                f = PM_branches["$(ix)"]["f_bus"]
+                t = PM_branches["$(ix)"]["t_bus"]
+                PMmap_br[(from_to = (ix, f, t), to_from = (ix, t, f))] = branch
+            end
+        end
+    end
+    return PM_branches, PMmap_br
+end
+
+function get_branches_to_pm(
+    sys::PSY.System,
+    system_formulation::Type{PTDFPowerModel},
+    ::Type{T},
+    partition_number::Int,
+    branch_template::BranchModelContainer,
+    start_idx = 0,
+) where {T <: PSY.DCBranch}
+    PM_branches = Dict{String, Any}()
+    PMmap_br = Dict{
+        NamedTuple{(:from_to, :to_from), Tuple{Tuple{Int, Int, Int}, Tuple{Int, Int, Int}}},
+        t where t <: T,
+    }()
+
+    return PM_branches, PMmap_br
+end
+
+###################################################
+
 function get_buses_to_pm(buses::IS.FlattenIteratorWrapper{PSY.Bus})
     PM_buses = Dict{String, Any}()
     PMmap_buses = Dict{Int, PSY.Bus}()
@@ -354,6 +404,43 @@ function pass_to_pm(sys::PSY.System, template::OperationsProblemTemplate, time_p
         length(ac_lines),
     )
     buses = PSY.get_components(PSY.Bus, sys)
+    pm_buses, PMmap_buses = get_buses_to_pm(buses)
+    PM_translation = Dict{String, Any}(
+        "bus" => pm_buses,
+        "branch" => ac_lines,
+        "baseMVA" => PSY.get_base_power(sys),
+        "per_unit" => true,
+        "storage" => Dict{String, Any}(),
+        "dcline" => dc_lines,
+        "gen" => Dict{String, Any}(),
+        "switch" => Dict{String, Any}(),
+        "shunt" => Dict{String, Any}(),
+        "load" => Dict{String, Any}(),
+    )
+
+    # TODO: this function adds overhead in large number of time_steps
+    # We can do better later.
+
+    PM_translation = PM.replicate(PM_translation, time_periods)
+
+    PM_map = PMmap(PMmap_buses, PMmap_ac, PMmap_dc)
+
+    return PM_translation, PM_map
+end
+
+############# my code #######################
+function pass_to_pm(sys::PSY.System, template::OperationsProblemTemplate, time_periods::Int,partition_number::Int)
+    ac_lines, PMmap_ac =
+        get_branches_to_pm(sys, template.transmission, PSY.ACBranch,partition_number, template.branches)
+    dc_lines, PMmap_dc = get_branches_to_pm(
+        sys,
+        template.transmission,
+        PSY.DCBranch,
+        partition_number,
+        template.branches,
+        length(ac_lines),
+    )
+    buses = get_components(PSY.Bus, sys,partition_number,ghostbuses=true)
     pm_buses, PMmap_buses = get_buses_to_pm(buses)
     PM_translation = Dict{String, Any}(
         "bus" => pm_buses,
