@@ -506,7 +506,7 @@ end
 
 ################ my code ##################
 function _build!(problem::OperationsProblem{ADMMSubProblem}, serialize::Bool)
-    TimerOutputs.@timeit BUILD_PROBLEMS_TIMER "Problem $(get_name(problem))" begin
+    #TimerOutputs.@timeit BUILD_PROBLEMS_TIMER "Problem $(get_name(problem))" begin
         try
             ext = problem.ext
             settings = PSI.get_settings(problem)
@@ -523,7 +523,7 @@ function _build!(problem::OperationsProblem{ADMMSubProblem}, serialize::Bool)
             bt = catch_backtrace()
             @error "Operation Problem Build Failed" exception = e, bt
         end
-    end
+    #end
     return get_status(problem)
 end
 ###########################################
